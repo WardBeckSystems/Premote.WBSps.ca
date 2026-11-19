@@ -19,6 +19,17 @@ It runs on Linux, macOS and Windows.
 ## Quick start
 
 ```sh
+python3 launch.py           # builds if needed, discovers units, opens the page in your browser
+python3 launch.py --sim     # same, plus a simulated PreMO on this machine (no hardware needed)
+```
+
+`launch.py` options: `--device IP` (repeatable), `--web-port 8080` (the next free port is
+used if it's taken), `--bind 0.0.0.0` (let other machines open the page), `--no-discovery`,
+`--no-browser`, `--rebuild`. Ctrl+C stops everything it started.
+
+Or run the binary directly:
+
+```sh
 cargo build --release
 ./target/release/premote serve            # discover units, web page on http://localhost:8080/
 ```
