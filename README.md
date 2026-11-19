@@ -22,3 +22,27 @@ Legacy PreMO remote software, kept as received (Google Drive export, 2026-11-19)
 - `Premo2,19/TCPRemote.exe`: a TCP remote utility (.NET)
 - `Premo2,19/APP2.bin`: firmware image
 - `PreMO manual draft.pdf`: draft manual
+
+## Recovered source (`decompiled/`)
+
+C# recovered from the .NET binaries above with ILSpy (`ilspycmd` 11.2), one project per program or library, all in `decompiled/PreMoRemote.sln`. The binaries above are the originals; this folder is a readable, rebuildable reconstruction, not the original source code: comments, original local-variable names and Visual Studio designer files are lost.
+
+| Project | Built from | Kind |
+|---|---|---|
+| `PreMo` | `Remote1.22.0/PreMo.exe` | Windows Forms app: login, home screen, meters (PPMMeter, MICLINE), user management, update |
+| `PreMoBLL` | `PreMoBLL.dll` | Business logic: device discovery over Bonjour, device control |
+| `PreMoDAL` | `PreMoDAL.dll` | Data access |
+| `Model` | `Model.dll` | Data model, AES70 and JSON types |
+| `OCAAes70` | `OCAAes70.dll` | AES70 (OCA) control classes and the OCP.1 protocol |
+| `Common`, `DNSService` | `Common.dll`, `DNSService.dll` | Small helpers |
+| `TCPRemote` | `Premo2,19/TCPRemote.exe` | Windows Forms TCP remote utility |
+
+Not decompiled (used as references from the original folder): `Newtonsoft.Json.dll`, `Interop.Bonjour.dll` (the Bonjour COM wrapper, needs Apple Bonjour installed to run) and `Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll`.
+
+Target: .NET Framework 4.5.2. Corrections made to the decompiler output so it compiles:
+- project references between the recovered projects instead of the original DLLs
+- the embedded Bonjour interop types replaced by a reference to `Interop.Bonjour.dll`
+- base-class calls the decompiler wrote as `((Control)this).X(...)` written as `base.X(...)`
+- `Timer` and `ManagementObjectEnumerator` written with their full type names
+
+Build status: every project compiles. On Windows (Visual Studio or `msbuild`), the whole solution builds. With the .NET SDK on Linux, everything except the final `PreMo` resource step builds; its forms embed images, which only the Windows build tools pack.

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>PreMoBLL</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net452</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="../Model/Model.csproj" />
+    <Reference Include="System.Management" />
+    <ProjectReference Include="../PreMoDAL/PreMoDAL.csproj" />
+    <ProjectReference Include="../OCAAes70/OCAAes70.csproj" />
+    <Reference Include="System.Core" />
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>../../preMO remote/Premo2,19/Remote1.22.0/Newtonsoft.Json.dll</HintPath>
+    </Reference>
+      <Reference Include="Interop.Bonjour">
+      <HintPath>../../preMO remote/Premo2,19/Remote1.22.0/Interop.Bonjour.dll</HintPath>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
+  </ItemGroup>
+</Project>
