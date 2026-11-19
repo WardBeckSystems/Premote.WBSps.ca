@@ -103,6 +103,9 @@ enum Command {
     Simulate {
         #[arg(long, default_value_t = device::CONTROL_PORT)]
         port: u16,
+        /// Imitate the PreMO "222" firmware (no START, AES70 float notifications).
+        #[arg(long)]
+        fw222: bool,
     },
     /// Print every control: key, block, object numbers and range.
     Controls,
@@ -156,7 +159,7 @@ async fn main() -> Result<()> {
             };
             updater::update(SocketAddr::from((ip, port)), &image, &opts, &mut progress).await
         }
-        Command::Simulate { port } => sim::run(port).await,
+        Command::Simulate { port, fw222 } => sim::run(port, fw222).await,
         Command::Controls => {
             println!("{:<16} {:<15} {:>5} {:>5} {:>5}  range", "key", "group", "block", "send", "state");
             for c in objects::CONTROLS {

@@ -269,10 +269,78 @@ pub fn encode_preset_response(file_num: u8, data: &[u8; PRESET_LEN]) -> [u8; RES
     b
 }
 
+/// A standard AES70 "PropertyChanged" notification, as sent by the PreMO
+/// "222" firmware (see docs/PROTOCOL.md §12 and docs/captures/). Everything
+/// is big-endian and the value is a float32 (dB for gains).
+///
+/// ```text
+///  0  3b              sync
+///  1  00 01           protocolVersion
+///  3  00 00 00 25     pduSize = total length − 5  (37 for 42 bytes)
+///  7  02              notification
+///  8  00 01           messageCount
+/// 10  00 00 00 1c     notificationSize (28)
+/// 14  00 00 00 04     targetONo
+/// 18  00 03 00 01     methodID 3.1
+/// 22  02              parameterCount
+/// 23  00 01 00        context blob (length 1, one byte)
+/// 26  00 00 36 b2     emitterONo (the object that changed)
+/// 30  00 01 00 01     eventID 1.1 = PropertyChanged
+/// 34  41 a8 00 00     value, float32 (21.0)
+/// 38  00 00 00 00     (zero in every capture so far)
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PropertyChange {
+    pub target: u32,
+    /// Object whose property changed.
+    pub ono: u32,
+    /// Event ID (level, index); (1, 1) = PropertyChanged.
+    pub event: (u16, u16),
+    /// The new value.
+    pub value: f32,
+    /// Bytes after the value (kept for analysis).
+    pub extra: Vec<u8>,
+}
+
+/// Length of the 222-firmware notification in the capture.
+pub const AES70_NTF_LEN: usize = 42;
+
+/// Encode a 222-style notification (used by the simulator); byte-identical
+/// to the captured ones for the same object and value.
+pub fn encode_property_change(ono: u32, value: f32) -> [u8; AES70_NTF_LEN] {
+    let mut b = [0u8; AES70_NTF_LEN];
+    b[0] = SYNC;
+    b[1..3].copy_from_slice(&1u16.to_be_bytes());
+    b[3..7].copy_from_slice(&((AES70_NTF_LEN - 5) as u32).to_be_bytes());
+    b[7] = MessageType::Ntf.as_byte();
+    b[8..10].copy_from_slice(&1u16.to_be_bytes());
+    b[10..14].copy_from_slice(&28u32.to_be_bytes());
+    b[14..18].copy_from_slice(&4u32.to_be_bytes());
+    b[18..22].copy_from_slice(&[0, 3, 0, 1]);
+    b[22] = 2;
+    b[23..26].copy_from_slice(&[0, 1, 0]);
+    b[26..30].copy_from_slice(&ono.to_be_bytes());
+    b[30..34].copy_from_slice(&[0, 1, 0, 1]);
+    b[34..38].copy_from_slice(&value.to_be_bytes());
+    b
+}
+
+/// True if the notification at the start of `b` looks like the standard
+/// big-endian AES70 form (222 firmware) rather than the 1.22.0 form:
+/// a sane big-endian pduSize and a notificationSize that fits inside it.
+fn is_aes70_ntf(b: &[u8]) -> Option<usize> {
+    let pdu_size = u32::from_be_bytes(b[3..7].try_into().ok()?) as usize;
+    let ntf_size = u32::from_be_bytes(b[10..14].try_into().ok()?) as usize;
+    let total = pdu_size + 5;
+    ((30..=1024).contains(&total) && ntf_size >= 16 && ntf_size + 10 <= total).then_some(total)
+}
+
 /// Anything the device can send on the control connection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Incoming {
     Notification(Notification),
+    /// Standard AES70 property change (222 firmware).
+    Property(PropertyChange),
     Preset(PresetResponse),
     /// A PDU of another type (kept for the log).
     Other { pdu_type: u8, bytes: Vec<u8> },
@@ -318,7 +386,7 @@ impl Framer {
             }
             let pdu_type = self.buf[7];
             let need = match MessageType::from(pdu_type) {
-                MessageType::Ntf => NOTIFICATION_LEN,
+                MessageType::Ntf => is_aes70_ntf(&self.buf).unwrap_or(NOTIFICATION_LEN),
                 MessageType::Rsp => RESPONSE_LEN,
                 // Unknown/other: trust pduSize if sane, else skip the sync byte.
                 _ => {
@@ -344,6 +412,13 @@ impl Framer {
 /// Decode one complete PDU (already framed).
 pub fn decode_pdu(b: &[u8]) -> Incoming {
     match MessageType::from(b[7]) {
+        MessageType::Ntf if is_aes70_ntf(b).is_some() && b.len() >= 38 => Incoming::Property(PropertyChange {
+            target: u32::from_be_bytes(b[14..18].try_into().unwrap()),
+            ono: u32::from_be_bytes(b[26..30].try_into().unwrap()),
+            event: (u16::from_be_bytes([b[30], b[31]]), u16::from_be_bytes([b[32], b[33]])),
+            value: f32::from_be_bytes(b[34..38].try_into().unwrap()),
+            extra: b[38..].to_vec(),
+        }),
         MessageType::Ntf if b.len() >= NOTIFICATION_LEN => {
             let mut params = [0u8; 8];
             params.copy_from_slice(&b[35..43]);
@@ -408,6 +483,26 @@ mod tests {
             }
             other => panic!("expected preset, got {other:?}"),
         }
+    }
+
+    /// Two notifications copied byte for byte from the PreMO 222 capture
+    /// (docs/captures/premo-222-notifications.txt), glued together.
+    #[test]
+    fn decodes_real_222_capture() {
+        let hex = "3b 00 01 00 00 00 25 02 00 01 00 00 00 1c 00 00 00 04 00 03 00 01 02 00 01 00 00 00 36 b2 00 01 00 01 41 a8 00 00 00 00 00 00 \
+                   3b 00 01 00 00 00 25 02 00 01 00 00 00 1c 00 00 00 04 00 03 00 01 02 00 01 00 00 00 2a fd 00 01 00 01 42 2c 00 00 00 00 00 00";
+        let bytes: Vec<u8> = hex.split_whitespace().filter(|t| *t != "\\").map(|t| u8::from_str_radix(t, 16).unwrap()).collect();
+        let mut f = Framer::new();
+        let got = f.push(&bytes);
+        assert_eq!(got.len(), 2);
+        match (&got[0], &got[1]) {
+            (Incoming::Property(a), Incoming::Property(b)) => {
+                assert_eq!((a.ono, a.event, a.value), (14002, (1, 1), 21.0));
+                assert_eq!((b.ono, b.value), (11005, 43.0));
+            }
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(&encode_property_change(14002, 21.0)[..], &bytes[..42]);
     }
 
     #[test]

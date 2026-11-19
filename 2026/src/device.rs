@@ -37,8 +37,22 @@ use tokio::time::{sleep, timeout};
 /// TCP port of the PreMO control (and update) service.
 pub const CONTROL_PORT: u16 = 58888;
 
-/// How long to wait for the `START` banner after connecting.
-const BANNER_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long to wait for the `START` banner after connecting. The PreMO
+/// "222" firmware never sends one (docs/PROTOCOL.md §12), so after this we
+/// carry on without it and treat the unit as the AES70 (222) kind.
+const BANNER_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Which protocol dialect the unit speaks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Dialect {
+    /// Not known yet (not connected).
+    Unknown,
+    /// Sends `START`, 1.22.0-style byte values (what PreMo.exe spoke).
+    Legacy,
+    /// No `START`; standard big-endian AES70 with float values (firmware 222).
+    Aes70,
+}
 
 /// Connection state shown on the page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -72,6 +86,11 @@ pub struct DeviceState {
     pub preset: Option<u8>,
     /// Notifications we could not map to a known control: "block/ono" -> byte.
     pub unknown: BTreeMap<String, u8>,
+    /// Protocol dialect detected on connect.
+    pub dialect: Dialect,
+    /// AES70 objects reported by a 222-firmware unit: ONo -> latest value.
+    /// Which front-panel control each one is has still to be mapped.
+    pub objects: BTreeMap<u32, f32>,
 }
 
 /// Events pushed to web clients.
@@ -88,6 +107,8 @@ pub enum Event {
     Link { link: Link },
     /// Human-readable log line (connection, raw PDUs, updater progress).
     Log { text: String },
+    /// An AES70 object reported a new value (222 firmware).
+    Object { ono: u32, value: f32 },
     /// Firmware update progress, 0–100.
     Progress { percent: u8, packet: usize, packets: usize },
 }
@@ -127,6 +148,8 @@ impl Device {
                 meters: Meters::default(),
                 preset: None,
                 unknown: BTreeMap::new(),
+                dialect: Dialect::Unknown,
+                objects: BTreeMap::new(),
             })),
             events,
             tx,
@@ -245,21 +268,40 @@ impl Device {
         let mut sock = timeout(Duration::from_secs(5), TcpStream::connect(addr)).await??;
         sock.set_nodelay(true)?;
 
-        // 1. Banner: the device greets every new connection with "START".
-        let mut banner = [0u8; 5];
-        timeout(BANNER_TIMEOUT, sock.read_exact(&mut banner)).await??;
-        if &banner != b"START" {
-            anyhow::bail!("unexpected banner {:?}", String::from_utf8_lossy(&banner));
-        }
+        // 1. Banner: 1.22.0-era units greet every connection with "START".
+        //    The 222 firmware stays silent; anything that arrives instead is
+        //    already protocol data and goes to the framer.
+        let mut framer = ocp1::Framer::new();
+        let mut first = [0u8; 256];
+        let dialect = match timeout(BANNER_TIMEOUT, sock.read(&mut first)).await {
+            Ok(Ok(0)) => anyhow::bail!("device closed the connection"),
+            Ok(Ok(n)) if first[..n].starts_with(b"START") => {
+                for pdu in framer.push(&first[5..n]) {
+                    self.handle(pdu).await;
+                }
+                Dialect::Legacy
+            }
+            Ok(Ok(n)) => {
+                for pdu in framer.push(&first[..n]) {
+                    self.handle(pdu).await;
+                }
+                Dialect::Aes70
+            }
+            Ok(Err(e)) => return Err(e.into()),
+            Err(_) => Dialect::Aes70, // silent: 222 firmware
+        };
+        self.state.write().await.dialect = dialect;
         self.set_link(Link::Connected).await;
-        self.log(format!("connected to {addr}"));
+        self.log(format!("connected to {addr} ({dialect:?} protocol)"));
 
-        // 2. Load the current settings: FILE read of preset 0.
-        sock.write_all(&ocp1::encode_command(block::FILE, file_op::READ, 0)).await?;
+        // 2. Legacy units: load the current settings with a FILE read of
+        //    preset 0, as PreMo.exe did. (222 units ignore it, so skip it.)
+        if dialect == Dialect::Legacy {
+            sock.write_all(&ocp1::encode_command(block::FILE, file_op::READ, 0)).await?;
+        }
 
         // 3. Pump both directions until something fails.
         let (mut rd, mut wr) = sock.into_split();
-        let mut framer = ocp1::Framer::new();
         let mut buf = [0u8; 1024];
         loop {
             tokio::select! {
@@ -287,6 +329,15 @@ impl Device {
     /// Apply one PDU from the device.
     async fn handle(&self, pdu: Incoming) {
         match pdu {
+            Incoming::Property(p) => {
+                // 222 firmware: remember the latest value per object. Repeats
+                // of the same value (the unit sometimes sends bursts) are
+                // not forwarded to the page.
+                let changed = self.state.write().await.objects.insert(p.ono, p.value) != Some(p.value);
+                if changed {
+                    self.emit(Event::Object { ono: p.ono, value: p.value });
+                }
+            }
             Incoming::Notification(n) if n.block == block::PPM => {
                 // Meter frame: 8 signed dB bytes, level/peak pairs.
                 let mut m = Meters::default();

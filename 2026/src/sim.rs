@@ -50,19 +50,56 @@ impl Memory {
 }
 
 /// Run the simulator on `port` until the process ends.
-pub async fn run(port: u16) -> anyhow::Result<()> {
+///
+/// `fw222 = true` imitates the PreMO "222" firmware seen on real hardware
+/// (docs/PROTOCOL.md §12): no `START` banner, commands ignored, and
+/// standard big-endian AES70 PropertyChanged notifications with float32
+/// values for objects 14002 (0.5 dB steps) and 11005 (1 dB steps), as if
+/// someone were turning two knobs on the front panel.
+pub async fn run(port: u16, fw222: bool) -> anyhow::Result<()> {
     let listener = TcpListener::bind(("0.0.0.0", port)).await?;
-    tracing::info!("simulated PreMO listening on 0.0.0.0:{port}");
+    tracing::info!("simulated PreMO ({}) listening on 0.0.0.0:{port}", if fw222 { "222 firmware" } else { "1.22.0 protocol" });
     let mem = Arc::new(Mutex::new(Memory::new()));
     loop {
         let (sock, peer) = listener.accept().await?;
         tracing::info!(%peer, "simulator: client connected");
         let mem = mem.clone();
         tokio::spawn(async move {
-            if let Err(e) = client(sock, mem).await {
+            let r = if fw222 { client_222(sock).await } else { client(sock, mem).await };
+            if let Err(e) = r {
                 tracing::info!(%peer, "simulator: client gone: {e}");
             }
         });
+    }
+}
+
+/// One client of the 222-firmware imitation: silent on connect, then a
+/// knob movement every couple of seconds. Anything the host sends is read
+/// and discarded, like the real unit did with a 1.22.0 FILE read.
+async fn client_222(sock: TcpStream) -> anyhow::Result<()> {
+    sock.set_nodelay(true)?;
+    let (mut rd, mut wr) = sock.into_split();
+    tokio::spawn(async move {
+        let mut buf = [0u8; 256];
+        while let Ok(n) = rd.read(&mut buf).await {
+            if n == 0 {
+                break;
+            }
+        }
+    });
+    let (mut a, mut b) = (21.0f32, 43.0f32);
+    let mut step = 0u32;
+    loop {
+        sleep(Duration::from_millis(1500)).await;
+        step += 1;
+        // Object 14002 sweeps 21.0 -> 16.5 -> 21.0 in 0.5 dB steps;
+        // object 11005 counts 43 -> 49 -> 43 in 1 dB steps.
+        a = if (step / 9) % 2 == 0 { a - 0.5 } else { a + 0.5 };
+        b = if (step / 6) % 2 == 0 { b + 1.0 } else { b - 1.0 };
+        wr.write_all(&ocp1::encode_property_change(14002, a)).await?;
+        if step % 2 == 0 {
+            wr.write_all(&ocp1::encode_property_change(11005, b)).await?;
+        }
     }
 }
 

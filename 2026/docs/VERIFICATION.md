@@ -22,6 +22,16 @@
 | Web page | headless Chrome against the simulator, no console errors | screenshot in `docs/device-page.png` |
 | Build | `cargo build`, `cargo test` | no warnings, 6/6 tests pass |
 
+## Real hardware (2026-11-19): PreMO 222 at 44.44.44.150
+
+| Check | Result |
+|---|---|
+| Discovery | announces `_rtsp._tcp` ("Desk preMO", "WBS-preMO-222") and `_http._tcp` |
+| TCP 58888 | accepts connections; **no `START`**, no answer to a legacy FILE read |
+| Front-panel changes | arrive as standard AES70 notifications, float32 dB (see PROTOCOL.md §12 and `captures/`) |
+| Stability | dropped off the network twice: once after an aggressive port scan, once 50 s into a listen-only connection (just after a burst of 31 repeated notifications). Recovered after a power cycle. |
+| premote against the 222 simulator | detects the aes70 dialect, shows live objects, hides the legacy cards |
+
 ## Still to check on a real PreMO
 
 These come from reading the legacy code; only a real unit can confirm them.

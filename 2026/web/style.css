@@ -105,3 +105,12 @@ summary h3 { display: inline; }
   #sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
   main { padding: 12px 16px; }
 }
+
+/* AES70 object table (222 firmware) */
+#objects { border-collapse: collapse; width: 100%; max-width: 520px; font-variant-numeric: tabular-nums; }
+#objects th, #objects td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--line); }
+#objects td.num { font-weight: 600; }
+#objects tr.flash td { color: var(--accent); }
+
+/* The hidden attribute must win over display rules above. */
+[hidden] { display: none !important; }

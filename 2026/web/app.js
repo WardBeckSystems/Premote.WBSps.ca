@@ -185,11 +185,45 @@ function setLink(link) {
   p.className = `pill ${link}`;
 }
 
+// ------------------------------------------------- 222 firmware objects --
+// ONo -> table row, for units that report standard AES70 property changes.
+const objectRows = new Map();
+
+function showObject(ono, value, flash = true) {
+  let row = objectRows.get(ono);
+  if (!row) {
+    row = el('tr', {}, el('td', {}, String(ono)), el('td', { class: 'num' }), el('td', { class: 'muted' }));
+    objectRows.set(ono, row);
+    const body = $('#objects tbody');
+    // Keep rows sorted by object number.
+    const after = [...objectRows.keys()].sort((a, b) => a - b).find((k) => k > ono);
+    body.insertBefore(row, after !== undefined ? objectRows.get(after) : null);
+  }
+  row.children[1].textContent = Number.isInteger(value) ? value.toFixed(1) : String(+value.toFixed(3));
+  row.children[2].textContent = new Date().toLocaleTimeString();
+  if (flash) { row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 400); }
+}
+
+// Show the legacy cards or the AES70 object table, depending on the unit.
+function setDialect(d) {
+  const aes70 = d === 'aes70';
+  $('#objects-card').hidden = !aes70;
+  $('#groups').hidden = aes70;
+  $('#meters-card').hidden = aes70;
+  $('#presets').hidden = aes70;
+  // The firmware updater and raw commands speak the 1.22.0 format; keep them
+  // away from 222 units until that firmware's protocol is confirmed.
+  $('#firmware').hidden = aes70;
+  $('#raw').hidden = aes70;
+}
+
 function applyState(s) {
   $('#dev-name').textContent = s.name;
   $('#dev-ip').textContent = s.ip;
   $('#dev-web').href = `http://${s.ip}/`;
   setLink(s.link);
+  setDialect(s.dialect);
+  for (const [ono, v] of Object.entries(s.objects || {})) showObject(+ono, v, false);
   for (const [k, v] of Object.entries(s.values)) widgets.get(k)?.set(v);
   drawMeters(s.meters);
   if (s.preset !== null) $('#preset-status').textContent = `Last loaded: preset ${s.preset}`;
@@ -201,6 +235,8 @@ function select(ip, push = true) {
   $('#empty').hidden = true;
   $('#device').hidden = false;
   $('#log').textContent = '';
+  objectRows.clear();
+  $('#objects tbody').innerHTML = '';
   if (ws) ws.close();
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/api/devices/${ip}/ws`);
@@ -210,6 +246,7 @@ function select(ip, push = true) {
       case 'state': applyState(e.state); break;
       case 'value': widgets.get(e.key)?.set(e.value); break;
       case 'meters': drawMeters(e.meters); break;
+      case 'object': setDialect('aes70'); showObject(e.ono, e.value); break;
       case 'link': setLink(e.link); log(`link: ${e.link}`); break;
       case 'log': log(e.text); break;
       case 'error': log(`error: ${e.text}`); break;

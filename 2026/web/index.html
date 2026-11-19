@@ -40,6 +40,16 @@
         <span id="dev-link" class="pill">disconnected</span>
       </header>
 
+      <!-- 222 firmware: AES70 objects the unit reports (docs/PROTOCOL.md §12) -->
+      <section class="card" id="objects-card" hidden>
+        <h3>Live objects (AES70)</h3>
+        <p class="muted">This unit runs the newer "222" firmware: it reports standard AES70
+          property changes with float values. Change settings on the unit's front panel and
+          they appear here. Which control each object is has not been mapped yet, so these
+          are read-only.</p>
+        <table id="objects"><thead><tr><th>Object</th><th>Value</th><th>Updated</th></tr></thead><tbody></tbody></table>
+      </section>
+
       <!-- PPM meters: block 176 notifications -->
       <section class="card" id="meters-card">
         <h3>PPM meters</h3>

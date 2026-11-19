@@ -304,6 +304,20 @@ off  bytes          field
   reboot brought it back. Its network stack is fragile: avoid bursts and keep to one
   connection.
 
-So 1.22.0 matches an older PreMO firmware. Supporting 222 needs a second codec in `premote`:
-standard big-endian AES70 with float values, an object map (14002, 11005, …) learned from
-the unit, and no `START` handshake.
+So 1.22.0 matches an older PreMO firmware. `premote` now handles both:
+
+- **Dialect detection.** After connecting it waits 2 s for `START`. If the banner comes, the
+  unit is treated as **legacy** (1.22.0 protocol, preset 0 is read). If nothing comes, or
+  protocol data arrives first, it is treated as **aes70** (222 firmware), and no legacy
+  commands are sent.
+- **Decoding.** The framer recognises the standard form by its big-endian sizes. These
+  notifications are decoded as `PropertyChange { ono, event, value: f32 }`. Repeated
+  identical values are dropped before they reach the page.
+- **Page.** For aes70 units it shows a **Live objects** table (object number, value, time).
+  The legacy controls, meters, presets, firmware and raw cards are hidden, because their
+  object numbers and formats don't apply.
+- **Testing.** `premote simulate --fw222` imitates this firmware, byte for byte from the
+  capture. The unit test `decodes_real_222_capture` decodes two captured PDUs.
+
+Still to do for 222: map object numbers to controls, then learn the setter (AES70 would be
+`SetGain` 4.2 with a float32; to be confirmed carefully on a unit that is not on air).
