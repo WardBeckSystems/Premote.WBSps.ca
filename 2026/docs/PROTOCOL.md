@@ -260,3 +260,50 @@ Source: `Home.Bonjour_Init`, `SimpleChat`, `ServiceFound`, `ServiceResolved`, `Q
   web page. The `premote` page links to it.
 - `Login.cs` / `UserManagement.cs` read users from `UserInfo.xml` at a hard-coded path on
   the developer's PC. `Program.Main` opens `Home` directly, so the login was never shown.
+
+---
+
+## 12. Real hardware: PreMO "222" firmware (first capture, 2026-11-19)
+
+Unit: `WBS-preMO-222` ("Desk preMO"), 44.44.44.150. Its web page on port 80 belongs to the
+Archwave AES67 module inside the unit; the module's `/device_list` names the unit.
+Capture: [`captures/premo-222-notifications.txt`](captures/premo-222-notifications.txt).
+
+What differs from what PreMo.exe 1.22.0 expected:
+
+- **No `START` banner.** TCP 58888 accepts the connection and stays silent, even straight
+  after a reboot. A legacy FILE read (block 160, ONo 162) got no answer.
+- **Notifications are standard AES70, big-endian, 42 bytes**, sent on their own when
+  settings are changed on the front panel (no subscription was made):
+
+```
+off  bytes          field
+ 0   3b             sync
+ 1   00 01          protocolVersion 1
+ 3   00 00 00 25    pduSize 37  (= total length − 5, the same convention as the 1.22.0 commands)
+ 7   02             pduType: notification
+ 8   00 01          messageCount 1
+10   00 00 00 1c    notificationSize 28
+14   00 00 00 04    targetONo 4
+18   00 03 00 01    methodID 3.1
+22   02             parameterCount 2
+23   00 01 00       context: blob, length 1, one 0x00 byte
+26   00 00 36 b2    emitterONo (14002)
+30   00 01 00 01    eventID 1.1 (PropertyChanged)
+34   41 a8 00 00    value: float32, 21.0
+38   00 00 00 00    (zero)
+```
+
+- **Values are float32 dB**, not single bytes. Objects seen:
+  - **14002**: stepped 21.0 → 16.5 → 21.0 in 0.5 dB steps;
+  - **11005**: 43.0 → 49.0 in 1 dB steps.
+
+  Which front-panel controls these are still has to be matched up.
+- **Caution:** at +50 s the unit sent 31 identical copies of one notification and dropped
+  off the network. An over-fast port scan earlier had also taken it off the network, and a
+  reboot brought it back. Its network stack is fragile: avoid bursts and keep to one
+  connection.
+
+So 1.22.0 matches an older PreMO firmware. Supporting 222 needs a second codec in `premote`:
+standard big-endian AES70 with float values, an object map (14002, 11005, …) learned from
+the unit, and no `START` handshake.
