@@ -19,7 +19,7 @@ Legacy PreMO remote software, kept as received (Google Drive export, 2026-11-19)
 | `preMO remote/PreMO manual draft.pdf` | 11939102 | `2f7c4a5c49878518cec3bf5c5c22608d41a77644333f5c4282d8c3ba463a39cd` |
 
 - `Premo2,19/Remote1.22.0/PreMo.exe`: PreMO Remote 1.22.0, a Windows .NET (x86) app, with its libraries (PreMoBLL, PreMoDAL, Model, Common, OCAAes70, DNSService / Interop.Bonjour, Newtonsoft.Json)
-- `Premo2,19/TCPRemote.exe`: a TCP remote utility (.NET)
+- `Premo2,19/TCPRemote.exe`: the "PreMoUpdate" firmware updater (.NET): enter the unit's IP, READFILE picks a `.bin` (e.g. `APP2.bin`), UPDATE sends it over TCP, REBOOT restarts the unit
 - `Premo2,19/APP2.bin`: firmware image
 - `PreMO manual draft.pdf`: draft manual
 
@@ -35,7 +35,7 @@ C# recovered from the .NET binaries above with ILSpy (`ilspycmd` 11.2), one proj
 | `Model` | `Model.dll` | Data model, AES70 and JSON types |
 | `OCAAes70` | `OCAAes70.dll` | AES70 (OCA) control classes and the OCP.1 protocol |
 | `Common`, `DNSService` | `Common.dll`, `DNSService.dll` | Small helpers |
-| `TCPRemote` | `Premo2,19/TCPRemote.exe` | Windows Forms TCP remote utility |
+| `TCPRemote` | `Premo2,19/TCPRemote.exe` | "PreMoUpdate": Windows Forms firmware updater over TCP |
 
 Not decompiled (used as references from the original folder): `Newtonsoft.Json.dll`, `Interop.Bonjour.dll` (the Bonjour COM wrapper, needs Apple Bonjour installed to run) and `Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll`.
 
