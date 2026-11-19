@@ -1,0 +1,39 @@
+# premote — PreMO host application (Rust)
+#
+# One binary that replaces the legacy Windows tools found in
+# ../preMO remote-20261119T130500Z-1-001/:
+#   * PreMo.exe 1.22.0 (the remote: discovery, controls, meters, presets)
+#   * TCPRemote.exe   (the "PreMoUpdate" firmware updater)
+# and adds a built-in web server that hosts an HTML control page for each
+# device, plus a device simulator for testing without hardware.
+#
+# See README.md and docs/ for the protocol and the design.
+
+[package]
+name = "premote"
+version = "0.1.0"
+edition = "2021"
+description = "PreMO host: AES70/OCP.1 device control, firmware update and a web control page"
+publish = false
+
+[dependencies]
+# Async runtime: TCP connections to devices, the web server, timers.
+tokio = { version = "1", features = ["full"] }
+# HTTP + WebSocket server for the HTML control page.
+axum = { version = "0.7", features = ["ws", "macros"] }
+# JSON for the web API and the WebSocket event stream.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Command line parsing (serve / discover / update / set / simulate).
+clap = { version = "4", features = ["derive"] }
+# mDNS / DNS-SD discovery (replaces Apple Bonjour's COM API).
+mdns-sd = "0.11"
+# Logging.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Error handling.
+anyhow = "1"
+# Web page files compiled into the binary (web/ folder).
+include_dir = "0.7"
+# Stream helpers for the WebSocket.
+futures-util = "0.3"

@@ -1,0 +1,107 @@
+/* PreMO control page styles. Colours are tokens so light/dark both work. */
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --ink: #1b1f24;
+  --muted: #5f6b7a;
+  --line: #d6dbe1;
+  --accent: #0a84c6;        /* PreMO routing-diagram blue, darkened for text */
+  --on: #1f9d55;
+  --warn: #c77700;
+  --bad: #c62828;
+  /* PPM colours from PPMMeter.cs: green / orange / red, dimmed when unlit */
+  --ppm-green: #1aa34a;  --ppm-green-off: #0f3a1d;
+  --ppm-amber: #f08c00;  --ppm-amber-off: #3d3010;
+  --ppm-red:   #e53935;  --ppm-red-off:   #3d1414;
+  --meter-bg: #111417;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418; --panel: #1a1f25; --ink: #e8ebef; --muted: #98a3b0; --line: #2c333c;
+    --accent: #4fb8ef;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: grid; grid-template-columns: 260px 1fr; min-height: 100vh;
+}
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 20px; margin: 0; }
+h3 { font-size: 15px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+code { font-size: 13px; }
+a { color: var(--accent); }
+.sub, .muted { color: var(--muted); font-size: 13px; }
+
+#sidebar { background: var(--panel); border-right: 1px solid var(--line); padding: 18px 14px; }
+#devices { list-style: none; padding: 0; margin: 16px 0; }
+#devices li a {
+  display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px;
+  text-decoration: none; color: var(--ink);
+}
+#devices li a:hover, #devices li a.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+#devices .ip { color: var(--muted); font-size: 12px; }
+#add-device { display: flex; gap: 6px; }
+#add-device input { flex: 1; min-width: 0; }
+
+main { padding: 18px; max-width: 1200px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+#dev-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; }
+.pill { padding: 3px 10px; border-radius: 999px; font-size: 13px; border: 1px solid var(--line); }
+.pill.connected { color: #fff; background: var(--on); border-color: var(--on); }
+.pill.connecting, .pill.updating { color: #fff; background: var(--warn); border-color: var(--warn); }
+.pill.disconnected { color: #fff; background: var(--bad); border-color: var(--bad); }
+
+#groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; margin-bottom: 14px; }
+#groups .card { margin: 0; }
+.ctl { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.ctl:first-of-type { border-top: 0; }
+.ctl label { font-size: 14px; }
+.ctl .val { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; min-width: 52px; text-align: right; }
+.ctl input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.ctl.flash .val, .ctl.flash label { color: var(--accent); }
+.seg { grid-column: 1 / -1; display: flex; gap: 4px; flex-wrap: wrap; }
+.seg button { min-width: 34px; }
+.seg button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.route-img { grid-column: 1 / -1; width: 100%; max-width: 320px; border-radius: 6px; background: #e3e3e3; }
+
+/* Toggle switch */
+.toggle { position: relative; width: 42px; height: 24px; }
+.toggle input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; z-index: 1; }
+.toggle span { position: absolute; inset: 0; border-radius: 999px; background: var(--line); transition: background .15s; }
+.toggle span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.toggle input:checked + span { background: var(--on); }
+.toggle input:checked + span::after { transform: translateX(18px); }
+.toggle input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button, input, select {
+  font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+input[type=number] { width: 72px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+progress { width: 100%; margin-top: 10px; }
+summary { cursor: pointer; list-style: none; }
+summary h3 { display: inline; }
+
+/* PPM meters: 40 segments each, like PPMMeter.cs */
+#meters { display: flex; gap: 22px; align-items: flex-end; overflow-x: auto; }
+.meter { display: grid; grid-template-columns: auto 22px; gap: 6px; align-items: end; }
+.meter .scale { position: relative; width: 26px; height: 240px; font-size: 10px; color: var(--muted); }
+.meter .scale span { position: absolute; right: 0; transform: translateY(50%); }
+.meter .bar { display: flex; flex-direction: column-reverse; gap: 2px; height: 240px; background: var(--meter-bg); padding: 3px; border-radius: 4px; }
+.meter .led { flex: 1; border-radius: 1px; }
+.meter .name { grid-column: 1 / -1; font-size: 12px; text-align: center; color: var(--muted); }
+.meter .num { grid-column: 1 / -1; font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+
+#log { max-height: 220px; overflow: auto; font-size: 12px; margin: 0; white-space: pre-wrap; }
+
+@media (max-width: 760px) {
+  body { grid-template-columns: 1fr; }
+  #sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+  main { padding: 12px 16px; }
+}

@@ -1,0 +1,99 @@
+<!doctype html>
+<!--
+  PreMO control page, served by `premote serve` (src/web.rs).
+  Everything below <main> is built by assets/app.js from /api/catalog,
+  so the page always matches the object map in src/objects.rs.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PreMO Remote</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <!-- Left: device list (mDNS discovery + devices added by IP) -->
+  <aside id="sidebar">
+    <h1>PreMO Remote</h1>
+    <p class="sub">Host for PreMO units on TCP 58888</p>
+    <ul id="devices"><li class="muted">Looking for devices…</li></ul>
+    <form id="add-device">
+      <input id="add-ip" placeholder="Add by IP, e.g. 192.168.1.50" inputmode="decimal" aria-label="Device IP address">
+      <button type="submit">Add</button>
+    </form>
+  </aside>
+
+  <!-- Right: the selected device's page -->
+  <main id="main">
+    <section id="empty" class="card">
+      <h2>No device selected</h2>
+      <p>Pick a PreMO on the left. Units announcing <code>_rtsp._tcp</code> appear automatically;
+         others can be added by IP address.</p>
+    </section>
+
+    <section id="device" hidden>
+      <header id="dev-head">
+        <div>
+          <h2 id="dev-name">—</h2>
+          <div class="muted"><span id="dev-ip"></span> · <a id="dev-web" target="_blank" rel="noopener">device's own web page</a></div>
+        </div>
+        <span id="dev-link" class="pill">disconnected</span>
+      </header>
+
+      <!-- PPM meters: block 176 notifications -->
+      <section class="card" id="meters-card">
+        <h3>PPM meters</h3>
+        <div id="meters"></div>
+      </section>
+
+      <!-- One card per control group, filled from the catalogue -->
+      <div id="groups"></div>
+
+      <!-- Presets: block 160 (select 161 / read 162 / write 163) -->
+      <section class="card" id="presets">
+        <h3>Presets</h3>
+        <div class="row">
+          <label>Preset <input id="preset-num" type="number" min="0" max="9" value="0"></label>
+          <button data-op="read" title="Load this preset from the device into the page">Read</button>
+          <button data-op="select" title="Make this preset active on the device">Recall</button>
+          <button data-op="write" title="Store the device's current settings in this preset">Store</button>
+        </div>
+        <p class="muted" id="preset-status"></p>
+      </section>
+
+      <!-- Firmware: the TCPRemote / PreMoUpdate protocol -->
+      <section class="card" id="firmware">
+        <h3>Firmware update</h3>
+        <div class="row">
+          <input id="fw-file" type="file" accept=".bin" aria-label="Firmware image">
+          <label><input id="fw-reboot" type="checkbox" checked> Send REBOOT first</label>
+          <label>Delay <input id="fw-delay" type="number" min="0" max="1000" value="0"> ms</label>
+          <button id="fw-go">Update</button>
+        </div>
+        <progress id="fw-progress" max="100" value="0"></progress>
+        <p class="muted">The control link closes during the update and reconnects afterwards.
+           Untick REBOOT only if the unit is already waiting in its boot loader.</p>
+      </section>
+
+      <!-- Advanced: send any command -->
+      <details class="card" id="raw">
+        <summary><h3>Raw command</h3></summary>
+        <div class="row">
+          <label>Block <input id="raw-block" type="number" value="16"></label>
+          <label>Object <input id="raw-ono" type="number" value="21"></label>
+          <label>Value <input id="raw-value" type="number" min="0" max="255" value="0"></label>
+          <button id="raw-go">Send</button>
+        </div>
+        <p class="muted">Sends one 28-byte OCP.1 command. See docs/PROTOCOL.md for the object map.</p>
+      </details>
+
+      <section class="card">
+        <h3>Log</h3>
+        <pre id="log"></pre>
+      </section>
+    </section>
+  </main>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>

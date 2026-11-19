@@ -1,5 +1,14 @@
 # Premote.WBSps.ca
 
+PreMO remote software: the legacy Windows tools, their recovered source, and a new Rust host application.
+
+| Folder | What |
+|---|---|
+| [`2026/`](2026/) | **premote**: the Rust host. Discovers PreMO units, controls them over AES70/OCP.1, updates firmware, and hosts an HTML control page per device. Start with [`2026/README.md`](2026/README.md); the protocol is in [`2026/docs/PROTOCOL.md`](2026/docs/PROTOCOL.md). |
+| `preMO remote-20261119T130500Z-1-001/` | The legacy software as received, and the C# recovered from it (below). |
+
+## Legacy software
+
 Legacy PreMO remote software, kept as received in `preMO remote-20261119T130500Z-1-001/` (Google Drive export, 2026-11-19). Compiled files only; no source code was included.
 
 | File | Bytes | SHA-256 |
